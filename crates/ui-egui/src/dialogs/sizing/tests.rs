@@ -34,7 +34,7 @@ fn points_and_picas_use_the_points_per_inch() {
 
 /// A translated label wider than the English column ("Dimensione immagine:" in Italian) widens
 /// the column instead of running out of the dialog on the left; one too long for the widest
-/// column elides.
+/// column elides, and the wider column still fits the room the dialog is given on the right.
 #[test]
 fn translated_labels_stay_inside_the_dialog() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -48,20 +48,20 @@ fn translated_labels_stay_inside_the_dialog() {
             // The test fonts have no CJK, Indic or Arabic faces: tofu boxes stand in for
             // those glyphs, laid out and measured like any other.
             let mut h = egui_kittest::Harness::builder().with_size(vec2(700.0, 400.0)).allow_missing_glyphs().build_ui_state(
-                |ui, (f, left): &mut (Map<String, Value>, f32)| {
-                    *left = ui.max_rect().left();
+                |ui, (f, room): &mut (Map<String, Value>, Rect)| {
+                    *room = ui.max_rect();
                     body(ui, f);
                 },
-                (fields.clone(), 0.0),
+                (fields.clone(), Rect::NOTHING),
             );
             PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
             h.run_steps(2);
-            let left = h.state().1;
+            let room = h.state().1;
             let texts: Vec<Rect> =
                 h.output().shapes.iter().filter(|s| matches!(s.shape, egui::Shape::Text(_))).map(|s| s.shape.visual_bounding_rect()).collect();
             assert!(!texts.is_empty(), "{command} {}: draws its labels", lang.code());
-            if let Some(r) = texts.iter().find(|r| r.left() < left - 0.5) {
-                failures.push(format!("{command} {}: text at {r:?} left of the dialog's {left}", lang.code()));
+            if let Some(r) = texts.iter().find(|r| r.left() < room.left() - 0.5 || r.right() > room.right() + 0.5) {
+                failures.push(format!("{command} {}: text at {r:?} outside the dialog's {room:?}", lang.code()));
             }
         }
         app.ui.dialogs.retain(|d| d.id != id);
